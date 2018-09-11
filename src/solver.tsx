@@ -3,6 +3,7 @@
 import * as React from 'react'
 
 //import * as Cassowary from 'cassowary'
+// @ts-ignore
 import * as Kiwi from 'kiwi.js'
 
 import ReactResizeDetector from 'react-resize-detector'
@@ -10,7 +11,6 @@ import ReactResizeDetector from 'react-resize-detector'
 interface ConstraintSet {
   addConstraint(constraint: Kiwi.Constraint)
   removeConstraint(constraint: Kiwi.Constraint)
-  createVariable(variableName: string)
 }
 
 type Layout = {}
@@ -55,9 +55,6 @@ export class Container extends React.Component<ContainerProps, ContainerState> {
     removeConstraint: (constraint: Kiwi.Constraint) => {
       this.solver.removeConstraint(constraint)
       this.setState({ dirty: true })
-    },
-    createVariable: (variableName: string) => {
-      return new Kiwi.Variable(variableName)
     }
   }
 
@@ -75,26 +72,21 @@ export class Container extends React.Component<ContainerProps, ContainerState> {
   }
 
   private recompute = () => {
-    console.log("recompute\n\t", this.solver._cnMap._array.map(({first,second}) => first.toString() + " " + second.toString()).join("\n\t"))
+    // console.log("recompute\n\t", this.solver._cnMap._array.map(({first,second}) => first.toString() + " " + second.toString()).join("\n\t"))
     this.solver.updateVariables()
     this.setState({ layout: { ...this.state.layout, data: Math.random() } })
   }
 
   render() {
-    if (typeof this.props.children !== "function") {
-      throw new Error("Pass a function as a child")
-    }
-    const DimensionConsumer = this.props.children
-
-    return <>
+    return (
       <ConstraintSetProvider value={this.constraintSet}>
         <LayoutProvider value={this.state.layout}>
           <DimensionGenerator namePrefix="">
-            {DimensionConsumer}
+            {this.props.children}
           </DimensionGenerator>
         </LayoutProvider>
       </ConstraintSetProvider>
-    </>
+    )
   }
 }
 
@@ -105,6 +97,8 @@ interface ItemProps {
 
   wrapContentWidth?: boolean
   wrapContentHeight?: boolean
+
+  debug?: boolean
 }
 
 export class Item extends React.Component<ItemProps> {
@@ -123,17 +117,15 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
 
   render() {
     const { left, right, top, bottom, width, height } = this.props.dimensions
-    const debugProps = this.props.layout.debug
+    const debugProps = this.props.debug || this.props.layout.debug
       ? { "data-debug-dimension": `${this.props.dimensions}` }
       : {}
     return <div style={this.computeStyleFromLayout()} {...debugProps}>
       <div style={{ display: "flex", width: "100%", height: "100%" }}>
         <ReactResizeDetector handleWidth handleHeight onResize={this.onResize} />
-        <Constraint expr={[[+1.0, right], [-1.0, left]]} equal={width} />
-        <Constraint expr={[[+1.0, bottom], [-1.0, top]]} equal={height} />
-        {this.props.children}
         { this.props.wrapContentWidth && <Constraint expr={width} equal={this.state.width} /> }
         { this.props.wrapContentHeight && <Constraint expr={height} equal={this.state.height} /> }
+        {this.props.children}
       </div>
     </div>
   }
@@ -159,7 +151,7 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
       width: (!this.props.wrapContentWidth) ? right - left : undefined,
       height: (!this.props.wrapContentHeight) ? bottom - top : undefined,
 
-      ...(this.props.layout.debug ? {
+      ...(this.props.debug || this.props.layout.debug ? {
         background: "blue",
         borderColor: "black",
         borderWidth: "3px",
@@ -169,7 +161,7 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
   }
 
   private findLayoutVariableValue(variable: kiwi.Variable) {
-    console.log(variable.name(), variable.value())
+    // console.log(variable.name(), variable.value())
     return variable.value()
   }
 }
@@ -179,6 +171,9 @@ interface ConstraintProps {
   lessThan?: any,
   moreThan?: any,
   equal?: any,
+
+  strength?: "strong" | "medium" | "weak"
+  debug?: boolean
 }
 
 export class Constraint extends React.PureComponent<ConstraintProps> {
@@ -200,24 +195,19 @@ function* expressionIterator(expression) {
   }
 } 
 
-function areConstraintsEqual(c1, c2, debug = false) {
-  const logDiff = () => debug && console.log("Constraints changed\n\t" + c1.toString() + "\n\t" + c2.toString())
+function areConstraintsEqual(c1, c2) {
   if (c1.op() !== c2.op()) {
-    logDiff()
     return false
   }
   if (c1.strength() !== c2.strength()) {
-    logDiff()
     return false
   }
   if (c1.expression().constant() !== c2.expression().constant()) {
-    logDiff()
     return false
   }
   const subExpression = c1.expression().minus(c2.expression())
   for (const pair of expressionIterator(subExpression)) {
     if (pair.second !== 0) {
-      logDiff()
       return false
     }
   }
@@ -229,7 +219,7 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
 
   componentDidMount() {
     this.constraint = this.createConstraint()
-    console.log("Creating contraint", this.constraint.toString())
+    this.props.debug && console.log("Creating contraint", this.constraint.toString())
     this.props.constraintSet.addConstraint(this.constraint)
   }
 
@@ -237,7 +227,11 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
     const oldConstraint = this.constraint
     const newConstraint = this.createConstraint()
 
-    if (this.props.constraintSet !== prevProps.constraintSet || !areConstraintsEqual(oldConstraint, newConstraint, true)) {
+    const equalConstraints = areConstraintsEqual(oldConstraint, newConstraint)
+    this.props.debug && !equalConstraints &&
+      console.log("Constraints changed\n\t" + oldConstraint.toString() + "\n\t" + newConstraint.toString())
+
+    if (this.props.constraintSet !== prevProps.constraintSet || !equalConstraints) {
       prevProps.constraintSet.removeConstraint(oldConstraint)
       this.props.constraintSet.addConstraint(newConstraint)
       this.constraint = newConstraint
@@ -254,19 +248,29 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
 
     const makeExpression = (data) => new Kiwi.Expression(...(Array.isArray(data) ? data : [data]))
 
+    const strength =
+        this.props.strength === "strong"
+          ? Kiwi.Strength.strong
+      : this.props.strength === "medium"
+          ? Kiwi.Strength.medium
+      : this.props.strength === "weak"
+          ? Kiwi.Strength.weak
+      : Kiwi.Strength.strong
+
     // console.log({ lessThan: this.props.lessThan, moreThan: this.props.moreThan, equal: this.props.equal })
     const constraint = new Kiwi.Constraint(
       makeExpression([
         [1.0, makeExpression(this.props.expr)],
       ]),
-      this.props.lessThan
-        ? Kiwi.Operator.Le 
-        : this.props.moreThan 
-          ? Kiwi.Operator.Ge : Kiwi.Operator.Eq,
+        this.props.lessThan
+          ? Kiwi.Operator.Le 
+      : this.props.moreThan 
+          ? Kiwi.Operator.Ge 
+      : Kiwi.Operator.Eq,
       makeExpression(
         firstDefined([this.props.lessThan, this.props.moreThan, this.props.equal])
       ),
-      Kiwi.Strength.strong
+      strength
     )
     return constraint
   }
@@ -274,14 +278,28 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
   render() { return null }
 }
 
-type GeneratorProps<T> = {
-  generate: (name: string) => T
-  namePrefix: string
-  children: (variables: { [key: string]: T }) => React.ReactNode
+function printVariable(variable: kiwi.Variable) {
+  return variable.value()
 }
 
-export class DimensionGenerator extends React.PureComponent<{ children: any, namePrefix: string }> {
-  private generateVariable(variableName: string) {
+function printDimension(dimension: DimensionVariables) {
+  return {
+    left: printVariable(dimension.left),
+    right: printVariable(dimension.right),
+    top: printVariable(dimension.top),
+    bottom: printVariable(dimension.bottom),
+    width: printVariable(dimension.width),
+    height: printVariable(dimension.height),
+  }
+}
+
+type DimensionGeneratorProps = {
+  namePrefix: GeneratorProps<DimensionVariables>["namePrefix"]
+  children: GeneratorProps<DimensionVariables>["children"]
+  debug?: boolean
+}
+export class DimensionGenerator extends React.PureComponent<DimensionGeneratorProps> {
+  private generateDimension(variableName: string): DimensionVariables {
     return {
       left: new Kiwi.Variable(variableName + "-left"),
       right: new Kiwi.Variable(variableName + "-right"),
@@ -289,35 +307,69 @@ export class DimensionGenerator extends React.PureComponent<{ children: any, nam
       bottom: new Kiwi.Variable(variableName + "-bottom"),
       width: new Kiwi.Variable(variableName + "-width"),
       height: new Kiwi.Variable(variableName + "-height"),
-      [Symbol.toPrimitive]: (_hint) => variableName,
+      [Symbol.toPrimitive as any]: (_hint) => variableName,
     }
   }
 
+  private generateConstraints(dimension: DimensionVariables) {
+    const { left, right, top, bottom, width, height } = dimension
+    return <>
+      <Constraint expr={[[+1.0, right], [-1.0, left]]} equal={width} />
+      <Constraint expr={[[+1.0, bottom], [-1.0, top]]} equal={height} />
+    </>
+  }
+
   render() {
-    return <Generator<DimensionVariables> generate={this.generateVariable} namePrefix={this.props.namePrefix}>
+    return <Generator<DimensionVariables>
+      generate={this.generateDimension}
+      generateConstraints={this.generateConstraints}
+      namePrefix={this.props.namePrefix}
+      debug={this.props.debug}
+      printElement={printDimension}
+    >
       {this.props.children}
     </Generator>
   }
 }
 
-export class VariableGenerator extends React.PureComponent<{ children: any, namePrefix: string }> {
+type VariableGeneratorProps = {
+  namePrefix: GeneratorProps<kiwi.Variable>["namePrefix"]
+  children: GeneratorProps<kiwi.Variable>["children"]
+  debug?: boolean
+}
+export class VariableGenerator extends React.PureComponent<VariableGeneratorProps> {
   private generateVariable(variableName: string) {
     return new Kiwi.Variable(variableName)
   }
 
   render() {
-    return <Generator<DimensionVariables> generate={this.generateVariable} namePrefix={this.props.namePrefix}>
+    return <Generator<kiwi.Variable> 
+      generate={this.generateVariable}
+      namePrefix={this.props.namePrefix}
+      debug={this.props.debug}
+      printElement={printVariable}
+    >
       {this.props.children}
     </Generator>
   }
 }
 
+type GeneratorProps<T> = {
+  generate: (name: string) => T
+  generateConstraints?: (object: T) => React.ReactNode
+  namePrefix: string
+  children: (variables: { [key: string]: T }) => React.ReactNode
+  debug?: boolean
+  printElement: (t: T) => any
+}
+
+// TODO: Make sure generated variables/dimensions are cleared once they are no longer needed
 class Generator<T> extends React.PureComponent<GeneratorProps<T>> {
   private objects: { [key: string]: T } = {}
   private objectGeneratorProxy: { [key: string]: T } = new Proxy({}, {
     get: (_obj, variableName: string): T => {
       if (!this.objects[variableName]) {
-        console.log("generating objects", this.props.namePrefix + variableName)
+        this.props.debug && console.log("generating objects", this.props.namePrefix + variableName)
         this.objects[variableName] = this.props.generate(this.props.namePrefix + variableName)
       } else {
         // console.log("reusing objects", variableName)
@@ -326,12 +378,38 @@ class Generator<T> extends React.PureComponent<GeneratorProps<T>> {
     }
   })
 
+  private log = () => {
+    if(!this.props.debug) return
+    for(const [variableName, variable] of Object.entries(this.objects)) {
+      console.log(this.props.namePrefix + variableName + " = ", this.props.printElement(variable))
+    }
+  }
+
   render() {
     if (typeof this.props.children !== "function") {
       throw new Error("Pass a function as a child")
     }
     const VariableConsumer = this.props.children
 
-    return VariableConsumer(this.objectGeneratorProxy)
+    if (this.props.debug) {
+      return <>
+        <LayoutConsumer>
+          {() => <Logger log={this.log} />}
+        </LayoutConsumer>
+        {VariableConsumer(this.objectGeneratorProxy)}
+        {this.props.generateConstraints && Object.values(this.objects).map(this.props.generateConstraints)}
+      </>
+    } else {
+      return <>
+        {VariableConsumer(this.objectGeneratorProxy)}
+        {this.props.generateConstraints && Object.values(this.objects).map(this.props.generateConstraints)}
+      </>
+    }
   }
+}
+
+class Logger extends React.Component<{ log: () => void }> {
+  componentDidMount() { this.props.log() }
+  componentDidUpdate() { this.props.log() }
+  render() { return null }
 }

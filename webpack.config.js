@@ -3,13 +3,7 @@ const webpack = require("webpack")
 
 const babelLoader = {
   loader: 'babel-loader',
-  options: {
-    presets: ["@babel/preset-env"],
-    plugins: [
-      "@babel/plugin-transform-react-jsx",
-      "@babel/plugin-proposal-class-properties"
-    ]
-  }
+  options: { extends: "./.babelrc" }
 }
 
 module.exports = {

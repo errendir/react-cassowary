@@ -1,7 +1,9 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 
-import { Container, Item, Constraint, AverageConstraint, ChainConstraint, Boundary } from './index'
+import {
+  Container, Item, Constraint, AverageConstraint, ChainConstraint, Boundary
+} from './index'
 
 class App extends React.Component<{}, { arrangement: "centered" | "topLeft" }> {
   constructor(props) {
