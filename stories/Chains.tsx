@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 import {
-  Container, Item, Constraint, AverageConstraint, Boundary, ChainConstraint, WeightedSum
+  Container, Item, Constraint, AverageConstraint, Boundary, ChainConstraint, WeightedSum, PlaceInside
 } from '../src/index'
 
 export default class Chains extends React.Component<{}> {
@@ -27,17 +27,14 @@ export default class Chains extends React.Component<{}> {
         <Boundary boundary={thirdRow} dimensions={[box7, box8, box9]} top left right bottom />
         <Boundary boundary={fourthRow} dimensions={[box10, box11, box12, box13]} top left right bottom />
 
-        {/* <Constraint expr={secondRow.top} moreThan={firstRow.bottom} />
-        <Constraint expr={thirdRow.top} moreThan={secondRow.bottom} /> */}
         <ChainConstraint direction="column" style="spread" boundary={background} variables={[firstRow, secondRow, thirdRow, fourthRow]}  />
 
         <Constraint expr={fullScreen.left} equal={0} />
         <Constraint expr={fullScreen.top} equal={0} />
+
         <Constraint expr={background.width} equal={[[0.9, fullScreen.width]]} />
         <Constraint expr={background.height} equal={[[0.9, fullScreen.height]]} />
-
-        <AverageConstraint variables={[background.left, background.right]} average={[[0.5, fullScreen.width]]} />
-        <AverageConstraint variables={[background.top, background.bottom]} average={[[0.5, fullScreen.height]]} />
+        <PlaceInside innerDimension={background} outerDimension={fullScreen} measureFrom="center" horizontalRatio={0.5} verticalRatio={0.5} />
 
         <AverageConstraint variables={[middleButton.left, middleButton.right]} average={[[1.0, background.left], [0.5, background.width]]} />
         <AverageConstraint variables={[middleButton.top, middleButton.bottom]} average={[[1.0, background.top], [0.5, background.height]]} />

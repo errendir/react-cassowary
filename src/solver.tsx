@@ -99,6 +99,7 @@ interface ItemProps {
   wrapContentHeight?: boolean
 
   debug?: boolean
+
 }
 
 export class Item extends React.Component<ItemProps> {
@@ -116,12 +117,15 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
   }
 
   render() {
-    const { left, right, top, bottom, width, height } = this.props.dimensions
+    const { width, height } = this.props.dimensions
     const debugProps = this.props.debug || this.props.layout.debug
       ? { "data-debug-dimension": `${this.props.dimensions}` }
       : {}
+    const innerStyle = this.props.wrapContentWidth || this.props.wrapContentHeight
+      ? { display: "flex", width: "100%", height: "100%", pointerEvents: "initial" as "initial" }
+      : { display: "contents" }
     return <div style={this.computeStyleFromLayout()} {...debugProps}>
-      <div style={{ display: "flex", width: "100%", height: "100%" }}>
+      <div style={innerStyle}>
         <ReactResizeDetector handleWidth handleHeight onResize={this.onResize} />
         { this.props.wrapContentWidth && <Constraint expr={width} equal={this.state.width} /> }
         { this.props.wrapContentHeight && <Constraint expr={height} equal={this.state.height} /> }
@@ -156,7 +160,9 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
         borderColor: "black",
         borderWidth: "3px",
         borderStyle: "dashed"
-      } : {})
+      } : {}),
+
+      pointerEvents: "none" as "none"
     }
   }
 
@@ -313,10 +319,10 @@ export class DimensionGenerator extends React.PureComponent<DimensionGeneratorPr
 
   private generateConstraints(dimension: DimensionVariables) {
     const { left, right, top, bottom, width, height } = dimension
-    return <>
+    return <React.Fragment key={dimension + ""}>
       <Constraint expr={[[+1.0, right], [-1.0, left]]} equal={width} />
       <Constraint expr={[[+1.0, bottom], [-1.0, top]]} equal={height} />
-    </>
+    </React.Fragment>
   }
 
   render() {

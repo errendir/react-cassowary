@@ -99,6 +99,45 @@ export class WeightedSum extends React.PureComponent<WeightedSumProps> {
   }
 }
 
+type PlaceInsideProps = {
+  innerDimension: DimensionVariables
+  outerDimension: DimensionVariables
+  horizontalRatio?: number
+  verticalRatio?: number
+  measureFrom: "sides" | "center"
+}
+export class PlaceInside extends React.PureComponent<PlaceInsideProps> {
+  render() {
+    const { innerDimension, outerDimension, horizontalRatio, verticalRatio, measureFrom } = this.props
+    const topMargin = (alpha) => [[alpha, innerDimension.top], [-alpha, outerDimension.top]]
+    const bottomMargin = (alpha) => [[alpha, outerDimension.bottom], [-alpha, innerDimension.bottom]]
+    const leftMargin = (alpha) => [[alpha, innerDimension.left], [-alpha, outerDimension.left]]
+    const rightMargin = (alpha) => [[alpha, outerDimension.right], [-alpha, innerDimension.right]]
+    return <>
+      {typeof horizontalRatio === "number" && measureFrom === "center" 
+        ? <Constraint
+            expr={[[0.5, innerDimension.left], [0.5, innerDimension.right]]}
+            equal={[[1.0 - horizontalRatio, outerDimension.left], [horizontalRatio, outerDimension.right]]}
+          />
+        : <Constraint
+            expr={leftMargin(1.0 - horizontalRatio)}
+            equal={rightMargin(horizontalRatio)}
+          />
+      }
+      {typeof verticalRatio === "number" && measureFrom === "center" 
+        ? <Constraint
+            expr={[[0.5, innerDimension.top], [0.5, innerDimension.bottom]]}
+            equal={[[1.0 - verticalRatio, outerDimension.top], [verticalRatio, outerDimension.bottom]] }
+          />
+        : <Constraint
+            expr={topMargin(1.0 - verticalRatio)}
+            equal={bottomMargin(verticalRatio)}
+          />
+      }
+    </>
+  }
+}
+
 type BoundaryProps = {
   boundary: DimensionVariables
   dimensions: any[],
