@@ -371,14 +371,19 @@ type GeneratorProps<T> = {
 
 // TODO: Make sure generated variables/dimensions are cleared once they are no longer needed
 class Generator<T> extends React.PureComponent<GeneratorProps<T>> {
+  private oldObjects: { [key: string]: T } | null = null
   private objects: { [key: string]: T } = {}
   private objectGeneratorProxy: { [key: string]: T } = new Proxy({}, {
     get: (_obj, variableName: string): T => {
-      if (!this.objects[variableName]) {
+      if (this.oldObjects === null) {
+        throw new Error("Generator can only be used in the render prop function")
+      }
+      if (!this.oldObjects[variableName]) {
         this.props.debug && console.log("generating objects", this.props.namePrefix + variableName)
         this.objects[variableName] = this.props.generate(this.props.namePrefix + variableName)
       } else {
-        // console.log("reusing objects", variableName)
+        this.objects[variableName] = this.oldObjects[variableName]
+        // this.props.debug && console.log("reusing objects", variableName)
       }
       return this.objects[variableName]
     }
@@ -396,18 +401,26 @@ class Generator<T> extends React.PureComponent<GeneratorProps<T>> {
       throw new Error("Pass a function as a child")
     }
     const VariableConsumer = this.props.children
+    this.oldObjects = this.objects
+    this.objects = {}
+    const children = VariableConsumer(this.objectGeneratorProxy)
+    this.props.debug && console.log(
+      "discarding objects",
+      Object.keys(this.oldObjects).filter(variableName => !!this.objects[variableName]).join(" ")
+    )
+    this.oldObjects = null
 
     if (this.props.debug) {
       return <>
         <LayoutConsumer>
           {() => <Logger log={this.log} />}
         </LayoutConsumer>
-        {VariableConsumer(this.objectGeneratorProxy)}
+        {children}
         {this.props.generateConstraints && Object.values(this.objects).map(this.props.generateConstraints)}
       </>
     } else {
       return <>
-        {VariableConsumer(this.objectGeneratorProxy)}
+        {children}
         {this.props.generateConstraints && Object.values(this.objects).map(this.props.generateConstraints)}
       </>
     }

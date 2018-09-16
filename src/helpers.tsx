@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { Constraint, VariableGenerator, DimensionVariables } from './solver'
+import { Constraint, VariableGenerator, DimensionVariables, DimensionGenerator } from './solver'
 import { equal } from 'assert';
 
 type AverageConstraintProps = {
@@ -99,6 +99,27 @@ export class WeightedSum extends React.PureComponent<WeightedSumProps> {
   }
 }
 
+type ConstraintManyProps = {
+  exprs: any[],
+  lessThan?: any,
+  moreThan?: any,
+  equal?: any,
+
+  strength?: "strong" | "medium" | "weak"
+}
+export class ConstraintMany extends React.PureComponent<ConstraintManyProps> {
+  render() {
+    return this.props.exprs.map((expr, i) => <Constraint
+      key={i}
+      expr={expr}
+      lessThan={this.props.lessThan}
+      moreThan={this.props.moreThan}
+      equal={this.props.equal}
+      strength={this.props.strength}
+    />)
+  }
+}
+
 type PlaceInsideProps = {
   innerDimension: DimensionVariables
   outerDimension: DimensionVariables
@@ -155,5 +176,69 @@ export class Boundary extends React.PureComponent<BoundaryProps> {
       {top && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.top} lessThan={dimension.top} />)}
       {bottom && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.bottom} moreThan={dimension.bottom} />)}
     </>
+  }
+}
+
+type TableRowCol = { dimension: DimensionVariables, cellDimensions: DimensionVariables[] }
+type TableProps = {
+  rows: number
+  cols: number
+  boundary: any
+
+  children: (rows: TableRowCol[], cols: TableRowCol[], cells: { [key: string]: DimensionVariables }) => React.ReactNode
+}
+
+export class Table extends React.Component<TableProps> {
+  render() {
+    if (typeof this.props.children !== "function") {
+      throw new Error("Pass a function as a child")
+    }
+    const VariableConsumer = this.props.children
+
+    return <DimensionGenerator namePrefix="">
+      {(generator) => {
+        const rows: { dimension: DimensionVariables, cellDimensions: DimensionVariables[] }[] = []
+        const cols: { dimension: DimensionVariables, cellDimensions: DimensionVariables[] }[] = []
+        const cells = {}
+        for (let c=0; c<this.props.rows; ++c) {
+          cols.push({
+            dimension: generator[`col${c}`],
+            cellDimensions: []
+          })
+        }
+        for (let r=0; r<this.props.rows; ++r) {
+          rows.push({
+            dimension: generator[`row${r}`],
+            cellDimensions: []
+          })
+          for (let c=0; c<this.props.cols; ++c) {
+            const cell = generator[`c${r}${c}`]
+            cells[`c${r}${c}`] = cell
+            rows[r].cellDimensions.push(cell)
+            cols[c].cellDimensions.push(cell)
+          }
+        }
+        return <>
+          {rows.map(({ dimension, cellDimensions }, r) => <>
+            <ConstraintMany key={r} exprs={cellDimensions.map(dimension => dimension.height)} equal={dimension.height} />
+            <Boundary boundary={dimension} dimensions={cellDimensions} top bottom left right />
+          </>)}
+          {cols.map(({ dimension, cellDimensions },c) => <>
+            <ConstraintMany key={c} exprs={cellDimensions.map(dimension => dimension.width)} equal={dimension.width} />
+            <Boundary boundary={dimension} dimensions={cellDimensions} top bottom left right />
+          </>)}
+
+          <ChainConstraint style="gapless" boundary={this.props.boundary} direction="column" variables={rows.map(row => row.dimension)} />
+          <Constraint expr={rows.map(row => row.dimension.height)} equal={this.props.boundary.height} />
+          {/* <WeightedSum variables={rows.map(row => ({ variable: row.dimension.height, weight: 1.0 }))} equal={this.props.boundary.height} /> */}
+
+          <ChainConstraint style="gapless" boundary={this.props.boundary} direction="row" variables={cols.map(col => col.dimension)} />
+          <Constraint expr={cols.map(col => col.dimension.width)} equal={this.props.boundary.width} />
+          {/* <WeightedSum variables={cols.map(col => ({ variable: col.dimension.width, weight: 1.0 }))} equal={this.props.boundary.width} /> */}
+
+          { VariableConsumer(rows, cols, cells) }
+        </>
+      }}
+    </DimensionGenerator>
   }
 }

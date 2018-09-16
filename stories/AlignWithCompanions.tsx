@@ -1,8 +1,8 @@
 import * as React from 'react'
 
 import {
-  Container, Item, Constraint, AverageConstraint, Boundary, PlaceInside
-} from '../src/index'
+  Container, Item, Constraint, Boundary, PlaceInside, DimensionGenerator
+} from '../src'
 
 const companionStyle = { 
   width: 150, height: 50,
@@ -19,6 +19,7 @@ type AlignWithCompanionsProps = {
     vRatio: number
     measureFrom: "center" | "sides"
   }
+  showComp2: boolean
 }
 
 export default class AlignWithCompanions extends React.Component<AlignWithCompanionsProps, { arrangement: "centered" | "topLeft" }> {
@@ -29,10 +30,9 @@ export default class AlignWithCompanions extends React.Component<AlignWithCompan
 
   render() {
     return <Container>
-      {({ fullScreen, image, comp1, comp2, comp3, imageWithCompanions }) => <>
+      {({ fullScreen, image, comp1, comp3, imageWithCompanions }) => <>
         <Item dimensions={fullScreen} wrapContentWidth wrapContentHeight>
-          <div style={{ width: "100vw", height: "100vh", background: "hsla(280, 50%, 50%, 0.5)" }}>
-          </div>
+          <div style={{ width: "100vw", height: "100vh", background: "hsla(230, 50%, 50%, 0.5)" }} />
         </Item>
         <Item dimensions={image}>
           <div
@@ -52,11 +52,17 @@ export default class AlignWithCompanions extends React.Component<AlignWithCompan
             This is perfectly centered
           </div>
         </Item>
-        <Item dimensions={comp2} wrapContentWidth wrapContentHeight>
-          <div style={{ ...companionStyle, width: companionStyle.width/2 }}>
-            Right
-          </div>
-        </Item>
+        {this.props.showComp2 && <DimensionGenerator namePrefix="">
+          {({ comp2 }) => <>
+            <Item dimensions={comp2} wrapContentWidth wrapContentHeight>
+              <div style={{ ...companionStyle, width: companionStyle.width/2 }}>
+                Right
+              </div>
+            </Item>
+            <PlaceInside innerDimension={comp2} outerDimension={image} measureFrom="center" horizontalRatio={1.0} verticalRatio={0.4} />
+            <Boundary boundary={imageWithCompanions} dimensions={[comp2]} top bottom left right />
+          </>}
+        </DimensionGenerator>}
         <Item dimensions={comp3} wrapContentWidth wrapContentHeight>
           <div style={{ ...companionStyle, width: companionStyle.width*2 }}>
             Larger left companion
@@ -75,14 +81,13 @@ export default class AlignWithCompanions extends React.Component<AlignWithCompan
         <Constraint expr={image.width} equal={[[0.7, fullScreen.width]]} />
         <Constraint expr={image.height} equal={[[0.7, fullScreen.height]]} />
 
-        <Boundary boundary={imageWithCompanions} dimensions={[image, comp1, comp2, comp3]} top bottom left right />
+        <Boundary boundary={imageWithCompanions} dimensions={[image, comp1, comp3]} top bottom left right />
 
         <PlaceInside innerDimension={comp1} outerDimension={image}
           measureFrom={this.props.comp1.measureFrom}
           horizontalRatio={this.props.comp1.hRatio}
           verticalRatio={this.props.comp1.vRatio}
         />
-        <PlaceInside innerDimension={comp2} outerDimension={image} measureFrom="center" horizontalRatio={1.0} verticalRatio={0.4} />
         <PlaceInside innerDimension={comp3} outerDimension={image} measureFrom="center" horizontalRatio={0.05} verticalRatio={0.6} />
       </>}
     </Container>

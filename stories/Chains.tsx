@@ -9,8 +9,7 @@ export default class Chains extends React.Component<{}> {
     return <Container>
       {({ fullScreen, background, middleButton, firstRow, secondRow, thirdRow, fourthRow, box1, box2, box3, box4, box5, box6, box7, box8, box9, box10, box11, box12, box13 }) => <>
         <Item dimensions={fullScreen} wrapContentWidth wrapContentHeight>
-          <div style={{ width: "100vw", height: "100vh", background: "hsla(280, 50%, 50%, 0.5)" }}>
-          </div>
+          <div style={{ width: "100vw", height: "100vh", background: "hsla(230, 50%, 50%, 0.5)" }} />
         </Item>
         <Item dimensions={background}>
           <div style={{ width: "100%", height: "100%", background: "hsla(320, 50%, 50%, 0.5)" }}>

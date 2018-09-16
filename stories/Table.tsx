@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 import {
-  Container, Item, Constraint, AverageConstraint, Boundary, ChainConstraint, WeightedSum
+  Container, Item, Constraint, AverageConstraint, Boundary, ChainConstraint, WeightedSum, ConstraintMany, PlaceInside, Table
 } from '../src'
 
 const cellStyle = (hue) => ({ 
@@ -12,88 +12,83 @@ const cellStyle = (hue) => ({
   color: "white"
 })
 
-export default class Table extends React.Component<{}> {
+export default class TableDemo extends React.Component<{}, { mode: number }> {
   constructor(props) {
     super(props)
+    this.state = { mode: 1 }
+  }
+
+  private interval = setInterval(() => {
+    this.setState({ mode: 1-this.state.mode })
+  }, 1000)
+
+  componentWillUnmount() {
+    // clearInterval(this.interval)
   }
 
   render() {
     return <Container>
-      {({ fullScreen, c11, c12, c13, c21, c22, c23, c31, c32, c33, row1, row2, row3, col1, col2, col3 }) => <>
+      {({ fullScreen }) => <>
         <Item dimensions={fullScreen} wrapContentWidth wrapContentHeight>
-          <div style={{ width: "100vw", height: "100vh", background: "hsla(280, 50%, 50%, 0.5)" }}>
-          </div>
+          <div style={{ width: "100vw", height: "100vh", background: "hsla(230, 50%, 50%, 0.5)" }} />
         </Item>
-        <Item dimensions={c11}>
-          <div style={cellStyle(250)} />
-        </Item>
-        <Item dimensions={c12}>
-          <div style={cellStyle(270)} />
-        </Item>
-        <Item dimensions={c13}>
-          <div style={cellStyle(280)} />
-        </Item>
-        <Item dimensions={c21}>
-          <div style={cellStyle(290)} />
-        </Item>
-        <Item dimensions={c22}>
-          <div style={cellStyle(300)} />
-        </Item>
-        <Item dimensions={c23}>
-          <div style={cellStyle(310)} />
-        </Item>
-        <Item dimensions={c31}>
-          <div style={cellStyle(320)} />
-        </Item>
-        <Item dimensions={c32}>
-          <div style={cellStyle(330)} />
-        </Item>
-        <Item dimensions={c33}>
-          <div style={cellStyle(340)} />
-        </Item>
-
         <Constraint expr={fullScreen.left} equal={0} />
         <Constraint expr={fullScreen.top} equal={0} />
+        <Table rows={3} cols={3} boundary={fullScreen}>
+          {([row1, row2, row3], [col1, col2, col3], cells) => <>
+            {this.renderCells(cells)}
+            {this.state.mode === 0
+              ? <>
+                <Constraint expr={row2.dimension.height} equal={[[2.0, row1.dimension.height]]} />
+                <Constraint expr={row3.dimension.height} equal={[[2.0, row2.dimension.height]]} />
 
-        {/* TODO: Add helpers for making tables like that */}
-        {/* <ChainConstraint style="gapless" boundary={fullScreen} direction="row" variables={[c11, c12, c13]} />
-        <ChainConstraint style="gapless" boundary={fullScreen} direction="row" variables={[c21, c22, c23]} />
-        <ChainConstraint style="gapless" boundary={fullScreen} direction="row" variables={[c31, c32, c33]} /> */}
+                <Constraint expr={col2.dimension.width} equal={[[2.0, col1.dimension.width]]} />
+                <Constraint expr={col3.dimension.width} equal={[[2.0, col2.dimension.width]]} />
+              </>
+              : <>
+                <Constraint expr={cells.c11.width} equal={[[5.0, cells.c11.height]]} />
+                <PlaceInside innerDimension={cells.c11} outerDimension={fullScreen} horizontalRatio={0.5} verticalRatio={0.5} measureFrom="sides" />
 
-        <WeightedSum variables={[c11, c12, c13].map(v => ({ variable: v.width, weight: 1.0 }))} equal={fullScreen.width} />
-        <WeightedSum variables={[c21, c22, c23].map(v => ({ variable: v.width, weight: 1.0 }))} equal={fullScreen.width} />
-        <WeightedSum variables={[c31, c32, c33].map(v => ({ variable: v.width, weight: 1.0 }))} equal={fullScreen.width} />
+                <Constraint expr={row3.dimension.height} equal={row1.dimension.height} />
 
-        <WeightedSum variables={[c11, c21, c31].map(v => ({ variable: v.height, weight: 1.0 }))} equal={fullScreen.height} />
-        <WeightedSum variables={[c12, c22, c32].map(v => ({ variable: v.height, weight: 1.0 }))} equal={fullScreen.height} />
-        <WeightedSum variables={[c13, c23, c33].map(v => ({ variable: v.height, weight: 1.0 }))} equal={fullScreen.height} />
-
-
-        <Boundary boundary={row1} dimensions={[c11, c12, c13]} top bottom left right />
-        <Boundary boundary={row2} dimensions={[c21, c22, c23]} top bottom left right />
-        <Boundary boundary={row3} dimensions={[c31, c32, c33]} top bottom left right />
-
-        <Boundary boundary={col1} dimensions={[c11, c21, c31]} top bottom left right />
-        <Boundary boundary={col2} dimensions={[c12, c22, c32]} top bottom left right />
-        <Boundary boundary={col3} dimensions={[c13, c23, c33]} top bottom left right />
-
-        <ChainConstraint style="gapless" boundary={fullScreen} direction="row" variables={[row1, row2, row3]} />
-        <ChainConstraint style="gapless" boundary={fullScreen} direction="column" variables={[col1, col2, col3]} />
+                <Constraint expr={col3.dimension.width} equal={col1.dimension.width} />
+                <Constraint expr={col3.dimension.width} equal={col2.dimension.width} />
+              </>}
+          </>}
+        </Table>
       </>}
     </Container>
   }
 
-  private createCeneteredConstraints({ fullScreen, image }) {
+  private renderCells({ c00, c01, c02, c10, c11, c12, c20, c21, c22 }: any) {
     return <>
-      <AverageConstraint variables={[image.left, image.right]} average={[[0.5, fullScreen.width]]} />
-      <AverageConstraint variables={[image.top, image.bottom]} average={[[0.5, fullScreen.height]]} />
-    </>
-  }
-
-  private createTopLeftConstraints({ fullScreen, image }) {
-    return <>
-      <Constraint expr={image.left} equal={fullScreen.left} />
-      <Constraint expr={image.top} equal={fullScreen.top} />
+      <Item dimensions={c00}>
+        <div style={cellStyle(150)} />
+      </Item>
+      <Item dimensions={c01}>
+        <div style={cellStyle(170)} />
+      </Item>
+      <Item dimensions={c02}>
+        <div style={cellStyle(190)} />
+      </Item>
+      <Item dimensions={c10}>
+        <div style={cellStyle(210)} />
+      </Item>
+      <Item dimensions={c11}>
+        <div style={cellStyle(230)} />
+      </Item>
+      <Item dimensions={c12}>
+        <div style={cellStyle(250)} />
+      </Item>
+      <Item dimensions={c20}>
+        <div style={cellStyle(270)} />
+      </Item>
+      <Item dimensions={c21}>
+        <div style={cellStyle(290)} />
+      </Item>
+      <Item dimensions={c22}>
+        <div style={cellStyle(310)} />
+      </Item>
     </>
   }
 }

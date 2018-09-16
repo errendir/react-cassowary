@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { storiesOf } from '@storybook/react'
-import { number, select, withKnobs } from '@storybook/addon-knobs';
+import { number, select, boolean, withKnobs } from '@storybook/addon-knobs';
 //import { action } from '@storybook/addon-actions'
 
 import AlignWithCompanions from './AlignWithCompanions'
 import Chains from './Chains'
 import Table from './Table'
+import Animation from './Animation'
 
 import {
   Container, Item, Constraint, AverageConstraint, ChainConstraint, Boundary
@@ -26,12 +27,16 @@ storiesOf('Constraint Layouts', module)
       max: 1.0,
       step: 0.01,
     })
+    const showComp2 = boolean("Show 2", false)
     const comp1MeasureFrom = select("Measure from", { "center": "center", "sides": "sides" }, "center")
-    return <AlignWithCompanions comp1={{ hRatio: comp1HRatio, vRatio: comp1VRatio, measureFrom: comp1MeasureFrom }} />
+    return <AlignWithCompanions comp1={{ hRatio: comp1HRatio, vRatio: comp1VRatio, measureFrom: comp1MeasureFrom }} showComp2={showComp2} />
   })
   .add('create vertical or horizontal chains', () => (
     <Chains />
   ))
   .add('create table', () => (
     <Table />
+  ))
+  .add('animation', () => (
+    <Animation />
   ))
