@@ -24,7 +24,7 @@
     "babel-core": "^7.0.0-bridge.0",
     "babel-loader": "^8.0.2",
     "cassowary": "^0.0.2",
-    "kiwi.js": "^1.0.2",
+    "kiwi.js": "^1.1.0",
     "moment": "^2.22.2",
     "react": "^16.5.0",
     "react-dom": "^16.5.0",

@@ -1,16 +1,14 @@
-/// <reference path="../node_modules/kiwi.js/lib/kiwi.d.ts" />
-
 import * as React from 'react'
 
 //import * as Cassowary from 'cassowary'
-// @ts-ignore
-import * as Kiwi from 'kiwi.js'
+
+import * as kiwi from "kiwi.js"
 
 import ReactResizeDetector from 'react-resize-detector'
 
 interface ConstraintSet {
-  addConstraint(constraint: Kiwi.Constraint)
-  removeConstraint(constraint: Kiwi.Constraint)
+  addConstraint(constraint: kiwi.Constraint)
+  removeConstraint(constraint: kiwi.Constraint)
 }
 
 type Layout = {}
@@ -45,14 +43,14 @@ export class Container extends React.Component<ContainerProps, ContainerState> {
     this.state = { layout: { debug: !!props.debug }, dirty: false }
   }
 
-  private solver: Kiwi.Solver = new Kiwi.Solver()
+  private solver: kiwi.Solver = new kiwi.Solver()
 
   private constraintSet: ConstraintSet = {
-    addConstraint: (constraint: Kiwi.Constraint) => {
+    addConstraint: (constraint: kiwi.Constraint) => {
       this.solver.addConstraint(constraint)
       this.setState({ dirty: true })
     },
-    removeConstraint: (constraint: Kiwi.Constraint) => {
+    removeConstraint: (constraint: kiwi.Constraint) => {
       this.solver.removeConstraint(constraint)
       this.setState({ dirty: true })
     }
@@ -192,13 +190,8 @@ export class Constraint extends React.PureComponent<ConstraintProps> {
 
 type ConstraintSetterProps = { constraintSet: ConstraintSet } & ConstraintProps
 
-function* expressionIterator(expression) {
-  const iterator = expression.terms()["__iter__"]()
-  while (true) {
-    const element = iterator["__next__"]()
-    if (element === undefined) break
-    yield element
-  }
+function expressionIterator(expression: kiwi.Expression) {
+  return expression.terms().array[Symbol.iterator]()
 } 
 
 function areConstraintsEqual(c1, c2) {
@@ -252,27 +245,27 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
     const firstDefined = (array) => 
       array.reduce((acc, val) => acc !== undefined ? acc : val, undefined)
 
-    const makeExpression = (data) => new Kiwi.Expression(...(Array.isArray(data) ? data : [data]))
+    const makeExpression = (data) => new kiwi.Expression(...(Array.isArray(data) ? data : [data]))
 
     const strength =
         this.props.strength === "strong"
-          ? Kiwi.Strength.strong
+          ? kiwi.Strength.strong
       : this.props.strength === "medium"
-          ? Kiwi.Strength.medium
+          ? kiwi.Strength.medium
       : this.props.strength === "weak"
-          ? Kiwi.Strength.weak
-      : Kiwi.Strength.strong
+          ? kiwi.Strength.weak
+      : kiwi.Strength.strong
 
     // console.log({ lessThan: this.props.lessThan, moreThan: this.props.moreThan, equal: this.props.equal })
-    const constraint = new Kiwi.Constraint(
+    const constraint = new kiwi.Constraint(
       makeExpression([
         [1.0, makeExpression(this.props.expr)],
       ]),
         this.props.lessThan
-          ? Kiwi.Operator.Le 
+          ? kiwi.Operator.Le 
       : this.props.moreThan 
-          ? Kiwi.Operator.Ge 
-      : Kiwi.Operator.Eq,
+          ? kiwi.Operator.Ge 
+      : kiwi.Operator.Eq,
       makeExpression(
         firstDefined([this.props.lessThan, this.props.moreThan, this.props.equal])
       ),
@@ -307,12 +300,12 @@ type DimensionGeneratorProps = {
 export class DimensionGenerator extends React.PureComponent<DimensionGeneratorProps> {
   private generateDimension(variableName: string): DimensionVariables {
     return {
-      left: new Kiwi.Variable(variableName + "-left"),
-      right: new Kiwi.Variable(variableName + "-right"),
-      top: new Kiwi.Variable(variableName + "-top"),
-      bottom: new Kiwi.Variable(variableName + "-bottom"),
-      width: new Kiwi.Variable(variableName + "-width"),
-      height: new Kiwi.Variable(variableName + "-height"),
+      left: new kiwi.Variable(variableName + "-left"),
+      right: new kiwi.Variable(variableName + "-right"),
+      top: new kiwi.Variable(variableName + "-top"),
+      bottom: new kiwi.Variable(variableName + "-bottom"),
+      width: new kiwi.Variable(variableName + "-width"),
+      height: new kiwi.Variable(variableName + "-height"),
       [Symbol.toPrimitive as any]: (_hint) => variableName,
     }
   }
@@ -345,7 +338,7 @@ type VariableGeneratorProps = {
 }
 export class VariableGenerator extends React.PureComponent<VariableGeneratorProps> {
   private generateVariable(variableName: string) {
-    return new Kiwi.Variable(variableName)
+    return new kiwi.Variable(variableName)
   }
 
   render() {

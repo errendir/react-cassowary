@@ -4104,9 +4104,9 @@ kind-of@^6.0.0, kind-of@^6.0.2:
   version "6.0.2"
   resolved "https://registry.yarnpkg.com/kind-of/-/kind-of-6.0.2.tgz#01146b36a6218e64e58f3a8d66de5d7fc6f6d051"
 
-kiwi.js@^1.0.2:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/kiwi.js/-/kiwi.js-1.0.2.tgz#7958d19b270bd89b96b0e9d8ea067df107276f18"
+kiwi.js@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/kiwi.js/-/kiwi.js-1.1.0.tgz#c9764b7c781aa3437a6eb20fe51d07f3f816a7a8"
 
 lazy-cache@^1.0.3:
   version "1.0.4"
