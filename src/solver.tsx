@@ -7,11 +7,15 @@ import * as kiwi from "kiwi.js"
 import ReactResizeDetector from 'react-resize-detector'
 
 interface ConstraintSet {
-  addConstraint(constraint: kiwi.Constraint)
-  removeConstraint(constraint: kiwi.Constraint)
+  addConstraint(constraint: kiwi.Constraint, delay: number)
+  removeConstraint(constraint: kiwi.Constraint, delay: number)
 }
 
-type Layout = {}
+type Layout = {
+  keyframeProgress: number
+  layoutId: number
+  debug: boolean
+}
 
 export type DimensionVariables = {
   left: kiwi.Variable,
@@ -34,25 +38,37 @@ type ContainerProps = {
 }
 type ContainerState = {
   dirty: boolean
-  layout
+  layout: Layout
 }
 
 export class Container extends React.Component<ContainerProps, ContainerState> {
   constructor(props) {
     super(props)
-    this.state = { layout: { debug: !!props.debug }, dirty: false }
+    this.state = { layout: { keyframeProgress: 1.0, debug: !!props.debug, layoutId: 0 }, dirty: false }
   }
 
   private solver: kiwi.Solver = new kiwi.Solver()
 
+  private lastKeyframeTime = Date.now()
+  // Only allow for one animation at a time currently
+  private nextKeyframes: number | null = null
+
   private constraintSet: ConstraintSet = {
-    addConstraint: (constraint: kiwi.Constraint) => {
+    addConstraint: (constraint: kiwi.Constraint, delay: number) => {
       this.solver.addConstraint(constraint)
       this.setState({ dirty: true })
+      if (delay !== 0) {
+        this.lastKeyframeTime = Date.now()
+        this.nextKeyframes = Date.now() + delay
+      }
     },
-    removeConstraint: (constraint: kiwi.Constraint) => {
+    removeConstraint: (constraint: kiwi.Constraint, delay: number) => {
       this.solver.removeConstraint(constraint)
       this.setState({ dirty: true })
+      if (delay !== 0) {
+        this.lastKeyframeTime = Date.now()
+        this.nextKeyframes = Date.now() + delay
+      }
     }
   }
 
@@ -63,16 +79,26 @@ export class Container extends React.Component<ContainerProps, ContainerState> {
   componentDidUpdate() {
     if (this.state.dirty) {
       this.recompute()
-      this.setState({ dirty: false })
     } else {
       console.log("Skipping layout, no changes")
     }
   }
 
   private recompute = () => {
-    // console.log("recompute\n\t", this.solver._cnMap._array.map(({first,second}) => first.toString() + " " + second.toString()).join("\n\t"))
-    this.solver.updateVariables()
-    this.setState({ layout: { ...this.state.layout, data: Math.random() } })
+    window.requestAnimationFrame(() => {
+      // console.log("recompute\n\t", this.solver._cnMap._array.map(({first,second}) => first.toString() + " " + second.toString()).join("\n\t"))
+      this.solver.updateVariables()
+      const keyframeProgress = this.nextKeyframes === null 
+        ? 1.0
+        : Math.min(1.0, (Date.now() - this.lastKeyframeTime) / (this.nextKeyframes - this.lastKeyframeTime))
+      const dirty = keyframeProgress < 1.0
+
+      console.log({ keyframeProgress })
+      this.setState({ dirty, layout: {
+        ...this.state.layout, layoutId: Math.random(),
+        keyframeProgress,
+      }})  
+    })
   }
 
   render() {
@@ -108,7 +134,7 @@ export class Item extends React.Component<ItemProps> {
   }
 }
 
-class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { width, height }> {
+class ItemPositioned extends React.Component<{ layout: Layout, } & ItemProps, { width, height }> {
   constructor(props) {
     super(props)
     this.state = { width: 0, height: 0 }
@@ -139,7 +165,7 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
     }
   }
 
-  computeStyleFromLayout() {
+  private computeStyleFromLayout() {
     const left = this.findLayoutVariableValue(this.props.dimensions.left)
     const right = this.findLayoutVariableValue(this.props.dimensions.right)
     const top = this.findLayoutVariableValue(this.props.dimensions.top)
@@ -164,9 +190,21 @@ class ItemPositioned extends React.Component<{ layout: any, } & ItemProps, { wid
     }
   }
 
+  private keyframeValuesCache = {}
+
   private findLayoutVariableValue(variable: kiwi.Variable) {
     // console.log(variable.name(), variable.value())
-    return variable.value()
+    const { keyframeProgress } = this.props.layout
+    const nextKeyframeValue = variable.value()
+    const oldKeyframeValue = this.keyframeValuesCache[variable.id()]
+
+    if (keyframeProgress === 1.0 || oldKeyframeValue === undefined) {
+      this.keyframeValuesCache[variable.id()] = nextKeyframeValue
+      return nextKeyframeValue
+    } else {
+      return (nextKeyframeValue - oldKeyframeValue) * keyframeProgress + oldKeyframeValue
+    }
+    
   }
 }
 
@@ -178,6 +216,10 @@ interface ConstraintProps {
 
   strength?: "strong" | "medium" | "weak"
   debug?: boolean
+
+  animateIn?: number
+  animateOut?: number
+  animateUpdates?: number
 }
 
 export class Constraint extends React.PureComponent<ConstraintProps> {
@@ -219,7 +261,7 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
   componentDidMount() {
     this.constraint = this.createConstraint()
     this.props.debug && console.log("Creating contraint", this.constraint.toString())
-    this.props.constraintSet.addConstraint(this.constraint)
+    this.props.constraintSet.addConstraint(this.constraint, this.props.animateIn || 0)
   }
 
   componentDidUpdate(prevProps: ConstraintSetterProps) {
@@ -230,15 +272,17 @@ class ConstraintSetter extends React.PureComponent<ConstraintSetterProps> {
     this.props.debug && !equalConstraints &&
       console.log("Constraints changed\n\t" + oldConstraint.toString() + "\n\t" + newConstraint.toString())
 
+    // TODO: Perhaps constraintSet swap should count as remove and add of the constraint
+    // with regard to the animation delays
     if (this.props.constraintSet !== prevProps.constraintSet || !equalConstraints) {
-      prevProps.constraintSet.removeConstraint(oldConstraint)
-      this.props.constraintSet.addConstraint(newConstraint)
+      prevProps.constraintSet.removeConstraint(oldConstraint, this.props.animateUpdates || 0)
+      this.props.constraintSet.addConstraint(newConstraint, this.props.animateUpdates || 0)
       this.constraint = newConstraint
     }
   }
 
   componentWillUnmount() {
-    this.props.constraintSet.removeConstraint(this.constraint)
+    this.props.constraintSet.removeConstraint(this.constraint, this.props.animateOut || 0)
   }
 
   createConstraint() {

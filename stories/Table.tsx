@@ -15,7 +15,7 @@ const cellStyle = (hue) => ({
 export default class TableDemo extends React.Component<{}, { mode: number }> {
   constructor(props) {
     super(props)
-    this.state = { mode: 1 }
+    this.state = { mode: 0 }
   }
 
   private interval = setInterval(() => {
@@ -23,7 +23,7 @@ export default class TableDemo extends React.Component<{}, { mode: number }> {
   }, 1000)
 
   componentWillUnmount() {
-    // clearInterval(this.interval)
+    clearInterval(this.interval)
   }
 
   render() {
@@ -39,20 +39,20 @@ export default class TableDemo extends React.Component<{}, { mode: number }> {
             {this.renderCells(cells)}
             {this.state.mode === 0
               ? <>
-                <Constraint expr={row2.dimension.height} equal={[[2.0, row1.dimension.height]]} />
-                <Constraint expr={row3.dimension.height} equal={[[2.0, row2.dimension.height]]} />
+                <Constraint animateOut={300} expr={row2.dimension.height} equal={[[2.0, row1.dimension.height]]} />
+                <Constraint animateOut={300} expr={row3.dimension.height} equal={[[2.0, row2.dimension.height]]} />
 
-                <Constraint expr={col2.dimension.width} equal={[[2.0, col1.dimension.width]]} />
-                <Constraint expr={col3.dimension.width} equal={[[2.0, col2.dimension.width]]} />
+                <Constraint animateOut={300} expr={col2.dimension.width} equal={[[2.0, col1.dimension.width]]} />
+                <Constraint animateOut={300} expr={col3.dimension.width} equal={[[2.0, col2.dimension.width]]} />
               </>
               : <>
-                <Constraint expr={cells.c11.width} equal={[[5.0, cells.c11.height]]} />
+                <Constraint animateOut={300} expr={cells.c11.width} equal={[[5.0, cells.c11.height]]} />
                 <PlaceInside innerDimension={cells.c11} outerDimension={fullScreen} horizontalRatio={0.5} verticalRatio={0.5} measureFrom="sides" />
 
-                <Constraint expr={row3.dimension.height} equal={row1.dimension.height} />
+                <Constraint animateOut={300} expr={row3.dimension.height} equal={row1.dimension.height} />
 
-                <Constraint expr={col3.dimension.width} equal={col1.dimension.width} />
-                <Constraint expr={col3.dimension.width} equal={col2.dimension.width} />
+                <Constraint animateOut={300} expr={col3.dimension.width} equal={col1.dimension.width} />
+                <Constraint animateOut={300} expr={col3.dimension.width} equal={col2.dimension.width} />
               </>}
           </>}
         </Table>
