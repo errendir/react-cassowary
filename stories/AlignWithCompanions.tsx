@@ -69,6 +69,7 @@ export default class AlignWithCompanions extends React.Component<AlignWithCompan
           </div>
         </Item>
         <PlaceInside
+          visualizeConstraints
           innerDimension={image}
           outerDimension={fullScreen}
           measureFrom="sides"

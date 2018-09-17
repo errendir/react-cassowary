@@ -1,8 +1,5 @@
-import * as React from 'react'
-
-//import * as Cassowary from 'cassowary'
-
 import * as kiwi from "kiwi.js"
+import * as React from 'react'
 
 import ReactResizeDetector from 'react-resize-detector'
 
@@ -16,6 +13,8 @@ type Layout = {
   layoutId: number
   debug: boolean
 }
+
+export type Expression = (kiwi.Variable | [number, kiwi.Variable])[] | kiwi.Variable | number
 
 export type DimensionVariables = {
   left: kiwi.Variable,
@@ -114,105 +113,11 @@ export class Container extends React.Component<ContainerProps, ContainerState> {
   }
 }
 
-interface ItemProps {
-  animate?: boolean
-
-  dimensions: DimensionVariables
-
-  wrapContentWidth?: boolean
-  wrapContentHeight?: boolean
-
-  debug?: boolean
-
-}
-
-export class Item extends React.Component<ItemProps> {
-  render() {
-    return <LayoutConsumer>
-      {(layout) => <ItemPositioned layout={layout} {...this.props} />}
-    </LayoutConsumer>
-  }
-}
-
-class ItemPositioned extends React.Component<{ layout: Layout, } & ItemProps, { width, height }> {
-  constructor(props) {
-    super(props)
-    this.state = { width: 0, height: 0 }
-  }
-
-  render() {
-    const { width, height } = this.props.dimensions
-    const debugProps = this.props.debug || this.props.layout.debug
-      ? { "data-debug-dimension": `${this.props.dimensions}` }
-      : {}
-    const innerStyle = this.props.wrapContentWidth || this.props.wrapContentHeight
-      ? { display: "flex", width: "100%", height: "100%", pointerEvents: "initial" as "initial" }
-      : { display: "contents" }
-    return <div style={this.computeStyleFromLayout()} {...debugProps}>
-      <div style={innerStyle}>
-        <ReactResizeDetector handleWidth handleHeight onResize={this.onResize} />
-        { this.props.wrapContentWidth && <Constraint expr={width} equal={this.state.width} /> }
-        { this.props.wrapContentHeight && <Constraint expr={height} equal={this.state.height} /> }
-        {this.props.children}
-      </div>
-    </div>
-  }
-
-  private onResize = (width, height) => {
-    // console.log({ width, height })
-    if (this.props.wrapContentHeight || this.props.wrapContentWidth) {
-      this.setState({ width, height })
-    }
-  }
-
-  private computeStyleFromLayout() {
-    const left = this.findLayoutVariableValue(this.props.dimensions.left)
-    const right = this.findLayoutVariableValue(this.props.dimensions.right)
-    const top = this.findLayoutVariableValue(this.props.dimensions.top)
-    const bottom = this.findLayoutVariableValue(this.props.dimensions.bottom)
-
-    return {
-      transition: this.props.animate ? "top 1s, left 1s, width 1s, height 1s" : undefined,
-      position: "absolute" as "absolute",
-      left,
-      top,
-      width: (!this.props.wrapContentWidth) ? right - left : undefined,
-      height: (!this.props.wrapContentHeight) ? bottom - top : undefined,
-
-      ...(this.props.debug || this.props.layout.debug ? {
-        background: "blue",
-        borderColor: "black",
-        borderWidth: "3px",
-        borderStyle: "dashed"
-      } : {}),
-
-      pointerEvents: "none" as "none"
-    }
-  }
-
-  private keyframeValuesCache = {}
-
-  private findLayoutVariableValue(variable: kiwi.Variable) {
-    // console.log(variable.name(), variable.value())
-    const { keyframeProgress } = this.props.layout
-    const nextKeyframeValue = variable.value()
-    const oldKeyframeValue = this.keyframeValuesCache[variable.id()]
-
-    if (keyframeProgress === 1.0 || oldKeyframeValue === undefined) {
-      this.keyframeValuesCache[variable.id()] = nextKeyframeValue
-      return nextKeyframeValue
-    } else {
-      return (nextKeyframeValue - oldKeyframeValue) * keyframeProgress + oldKeyframeValue
-    }
-    
-  }
-}
-
 interface ConstraintProps {
-  expr: any,
-  lessThan?: any,
-  moreThan?: any,
-  equal?: any,
+  expr: Expression,
+  lessThan?: Expression,
+  moreThan?: Expression,
+  equal?: Expression,
 
   strength?: "strong" | "medium" | "weak"
   debug?: boolean
@@ -468,4 +373,267 @@ class Logger extends React.Component<{ log: () => void }> {
   componentDidMount() { this.props.log() }
   componentDidUpdate() { this.props.log() }
   render() { return null }
+}
+
+type NamedVariables = { [key: string]: kiwi.Variable }
+type NamedDimesions = { [key: string]: DimensionVariables }
+interface LayoutElementProps<V extends NamedVariables, D extends NamedDimesions> {
+  variables?: V,
+  dimesions?: D,
+  layout?: Layout
+  children: (vars: { [T in keyof V]: number }, dims: { [T in keyof D]: any }) => React.ReactNode
+}
+export class LayoutElement<V extends NamedVariables, D extends NamedDimesions> extends React.Component<LayoutElementProps<V,D>> {
+  render() {
+    if (!this.props.layout) {
+      return <LayoutConsumer>
+        {(layout) => <LayoutElement layout={layout} {...this.props} />}
+      </LayoutConsumer>
+    }
+
+    const vars: any = {}
+    for (const [key, variable] of Object.entries(this.props.variables || {} as { [key: string]: never })) {
+      vars[key] = this.findLayoutVariableValue(variable)
+    }
+
+    const dims: any = {}
+    for (const [key, dimension] of Object.entries(this.props.dimesions || {} as { [key: string]: never })) {
+      dims[key] = this.findLayoutDimensionValue(dimension)
+    }
+
+    return this.props.children(vars, dims)
+  }
+
+  private keyframeValuesCache: { [key: number]: number } = {}
+
+  private findLayoutVariableValue(variable: kiwi.Variable) {
+    // console.log(variable.name(), variable.value())
+    const { keyframeProgress } = this.props.layout
+    const nextKeyframeValue = variable.value()
+    const oldKeyframeValue = this.keyframeValuesCache[variable.id()]
+
+    if (keyframeProgress === 1.0 || oldKeyframeValue === undefined) {
+      this.keyframeValuesCache[variable.id()] = nextKeyframeValue
+      return nextKeyframeValue
+    } else {
+      return (nextKeyframeValue - oldKeyframeValue) * keyframeProgress + oldKeyframeValue
+    }
+  }
+
+  private findLayoutDimensionValue(dimension: DimensionVariables) {
+    return {
+      left: this.findLayoutVariableValue(dimension.left),
+      right: this.findLayoutVariableValue(dimension.right),
+      top: this.findLayoutVariableValue(dimension.top),
+      bottom: this.findLayoutVariableValue(dimension.bottom),
+      width: this.findLayoutVariableValue(dimension.width),
+      height: this.findLayoutVariableValue(dimension.height),
+    }
+  }
+}
+
+interface ItemProps {
+  dimensions: DimensionVariables
+
+  wrapContentWidth?: boolean
+  wrapContentHeight?: boolean
+
+  debug?: boolean
+}
+
+export class Item extends React.Component<ItemProps, { width: number, height: number }> {
+  constructor(props) {
+    super(props)
+    this.state = { width: 0, height: 0 }
+  }
+
+  render() {
+    return <LayoutElement dimesions={{ dimensions: this.props.dimensions }}>
+      {(_vars, { dimensions }) => {
+        const debugProps = this.props.debug
+          ? { "data-debug-dimension": `${this.props.dimensions}` }
+          : {}
+        const innerStyle = this.props.wrapContentWidth || this.props.wrapContentHeight
+          ? { display: "flex", width: "100%", height: "100%", pointerEvents: "initial" as "initial" }
+          : { display: "contents" }
+        return <div style={this.computeStyleFromLayout(dimensions)} {...debugProps}>
+          <div style={innerStyle}>
+            <ReactResizeDetector handleWidth handleHeight onResize={this.onResize} />
+            { this.props.wrapContentWidth && <Constraint expr={this.props.dimensions.width} equal={this.state.width} /> }
+            { this.props.wrapContentHeight && <Constraint expr={this.props.dimensions.height} equal={this.state.height} /> }
+            {this.props.children}
+          </div>
+        </div>
+      }}
+    </LayoutElement>
+  }
+
+  private onResize = (width, height) => {
+    // console.log({ width, height })
+    if (this.props.wrapContentHeight || this.props.wrapContentWidth) {
+      this.setState({ width, height })
+    }
+  }
+
+  private computeStyleFromLayout({ left, right, top, bottom }) {
+    return {
+      position: "absolute" as "absolute",
+      left,
+      top,
+      width: (!this.props.wrapContentWidth) ? right - left : undefined,
+      height: (!this.props.wrapContentHeight) ? bottom - top : undefined,
+
+      ...(this.props.debug ? {
+        background: "blue",
+        borderColor: "black",
+        borderWidth: "3px",
+        borderStyle: "dashed"
+      } : {}),
+
+      pointerEvents: "none" as "none"
+    }
+  }
+}  
+
+// export class Item extends React.Component<ItemProps> {
+//   render() {
+//     return <LayoutConsumer>
+//       {(layout) => <ItemPositioned layout={layout} {...this.props} />}
+//     </LayoutConsumer>
+//   }
+// }
+
+// class ItemPositioned extends React.Component<{ layout: Layout, } & ItemProps, { width, height }> {
+//   constructor(props) {
+//     super(props)
+//     this.state = { width: 0, height: 0 }
+//   }
+
+//   render() {
+//     const { width, height } = this.props.dimensions
+//     const debugProps = this.props.debug
+//       ? { "data-debug-dimension": `${this.props.dimensions}` }
+//       : {}
+//     const innerStyle = this.props.wrapContentWidth || this.props.wrapContentHeight
+//       ? { display: "flex", width: "100%", height: "100%", pointerEvents: "initial" as "initial" }
+//       : { display: "contents" }
+//     return <div style={this.computeStyleFromLayout()} {...debugProps}>
+//       <div style={innerStyle}>
+//         <ReactResizeDetector handleWidth handleHeight onResize={this.onResize} />
+//         { this.props.wrapContentWidth && <Constraint expr={width} equal={this.state.width} /> }
+//         { this.props.wrapContentHeight && <Constraint expr={height} equal={this.state.height} /> }
+//         {this.props.children}
+//       </div>
+//     </div>
+//   }
+
+//   private onResize = (width, height) => {
+//     // console.log({ width, height })
+//     if (this.props.wrapContentHeight || this.props.wrapContentWidth) {
+//       this.setState({ width, height })
+//     }
+//   }
+
+//   private computeStyleFromLayout() {
+//     const left = this.findLayoutVariableValue(this.props.dimensions.left)
+//     const right = this.findLayoutVariableValue(this.props.dimensions.right)
+//     const top = this.findLayoutVariableValue(this.props.dimensions.top)
+//     const bottom = this.findLayoutVariableValue(this.props.dimensions.bottom)
+
+//     return {
+//       position: "absolute" as "absolute",
+//       left,
+//       top,
+//       width: (!this.props.wrapContentWidth) ? right - left : undefined,
+//       height: (!this.props.wrapContentHeight) ? bottom - top : undefined,
+
+//       ...(this.props.debug ? {
+//         background: "blue",
+//         borderColor: "black",
+//         borderWidth: "3px",
+//         borderStyle: "dashed"
+//       } : {}),
+
+//       pointerEvents: "none" as "none"
+//     }
+//   }
+
+//   private keyframeValuesCache = {}
+
+//   private findLayoutVariableValue(variable: kiwi.Variable) {
+//     // console.log(variable.name(), variable.value())
+//     const { keyframeProgress } = this.props.layout
+//     const nextKeyframeValue = variable.value()
+//     const oldKeyframeValue = this.keyframeValuesCache[variable.id()]
+
+//     if (keyframeProgress === 1.0 || oldKeyframeValue === undefined) {
+//       this.keyframeValuesCache[variable.id()] = nextKeyframeValue
+//       return nextKeyframeValue
+//     } else {
+//       return (nextKeyframeValue - oldKeyframeValue) * keyframeProgress + oldKeyframeValue
+//     }
+//   }
+// }
+
+type EvaluateSingleExpressionProps = {
+  expr: Expression,
+  children: (expressionValue: number) => React.ReactNode,
+}
+type EvaluateMultipleExpressionsProps<T extends { [key: string]: Expression }> = {
+  exprs: T
+  children: (values: { [K in keyof T]: number }) => React.ReactNode,
+}
+type EvaluateExpressionProps<T extends { [key: string]: Expression }> = 
+  EvaluateSingleExpressionProps | 
+  EvaluateMultipleExpressionsProps<T>
+export class EvaluateExpression<T extends { [key: string]: Expression }> extends React.PureComponent<EvaluateExpressionProps<T>> {
+  render() {
+    if ("expr" in this.props) {
+      return <EvaluateSingleExpression {...this.props} />
+    } else {
+      return <EvaluateMultipleExpressions {...this.props} />
+    }
+  }
+}
+
+// TODO: This approach to evaluating expressions can be optimized - there is no need for the separate variable and constraint
+class EvaluateSingleExpression extends React.PureComponent<EvaluateSingleExpressionProps> {
+  render() {
+    return <VariableGenerator namePrefix="">
+      {({ expressionValue }) => <>
+        <Constraint expr={this.props.expr} equal={expressionValue} />
+        <LayoutElement variables={{ expressionValue }}>
+          {({ expressionValue }) => this.props.children(expressionValue)}
+        </LayoutElement>
+      </>}
+    </VariableGenerator>
+  }
+}
+
+class EvaluateMultipleExpressions<T extends { [key: string]: Expression }> extends React.PureComponent<EvaluateMultipleExpressionsProps<T>> {
+  render() {
+    return <VariableGenerator namePrefix="">
+      {(generator) => {
+        const variables = this.prepareVariables(generator)
+        return <>
+          {Object.entries(this.props.exprs).map(([name, expr]) => <Constraint
+            key={name}
+            expr={expr}
+            equal={variables[name]}
+          />)}
+          <LayoutElement variables={variables}>
+            {this.props.children}
+          </LayoutElement>
+        </>
+      }}
+    </VariableGenerator>
+  }
+
+  private prepareVariables(generator: { [key: string]: kiwi.Variable }) {
+    const _variables: { [key: string]: kiwi.Variable } = {}
+    for (const key of Object.keys(this.props.exprs)) {
+      _variables[key] = generator[key]
+    }
+    return _variables as { [key in keyof T]: kiwi.Variable }
+  }
 }

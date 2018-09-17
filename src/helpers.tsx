@@ -1,21 +1,26 @@
+import * as kiwi from 'kiwi.js'
 import * as React from 'react'
 
-import { Constraint, VariableGenerator, DimensionVariables, DimensionGenerator } from './solver'
-import { equal } from 'assert';
+import { Constraint, VariableGenerator, DimensionVariables, DimensionGenerator, Expression } from './solver'
+import { Arrow } from './arrows'
 
 type AverageConstraintProps = {
-  variables: any[],
-  average: any
+  variables: kiwi.Variable[],
+  average: Expression
 }
 export class AverageConstraint extends React.PureComponent<AverageConstraintProps> {
   render() {
     const weight = 1.0 / this.props.variables.length
-    return <Constraint expr={this.props.variables.map(variable => ([weight, variable]))} moreThan={this.props.average} />
+    return <Constraint
+      expr={this.props.variables.map((variable): [number, kiwi.Variable] => ([weight, variable]))}
+      moreThan={this.props.average}
+      // Why moreThan?
+    />
   }
 }
 
 type ChainConstraintProps = {
-  variables: any[],
+  variables: DimensionVariables[],  // TODO: Rename this
   boundary,
   direction: "row" | "row-reverse" | "column" | "column-reverse"
   style: "spread" | "spread_inside" | "packed" | "gapless" // TODO: Fix differences between spread and spread_inside, align packed
@@ -68,10 +73,10 @@ export class ChainConstraint extends React.PureComponent<ChainConstraintProps> {
 }
 
 type WeightedSumProps = {
-  variables: { variable: any, weight: number }[],
-  lessThan?: any,
-  moreThan?: any,
-  equal?: any,
+  variables: { variable: kiwi.Variable, weight: number }[],
+  lessThan?: Expression,
+  moreThan?: Expression,
+  equal?: Expression,
 
   strength?: "strong" | "medium" | "weak"
 }
@@ -81,7 +86,7 @@ export class WeightedSum extends React.PureComponent<WeightedSumProps> {
       <VariableGenerator namePrefix="">
         {({ unit }) => <>
           <Constraint
-            expr={this.props.variables.map(({ weight }) => ([ weight, unit ]))}
+            expr={this.props.variables.map(({ weight }): [number, kiwi.Variable] => [ weight, unit ])}
             lessThan={this.props.lessThan}
             moreThan={this.props.moreThan}
             equal={this.props.equal}
@@ -100,10 +105,10 @@ export class WeightedSum extends React.PureComponent<WeightedSumProps> {
 }
 
 type ConstraintManyProps = {
-  exprs: any[],
-  lessThan?: any,
-  moreThan?: any,
-  equal?: any,
+  exprs: Expression[],
+  lessThan?: Expression,
+  moreThan?: Expression,
+  equal?: Expression,
 
   strength?: "strong" | "medium" | "weak"
 }
@@ -126,14 +131,17 @@ type PlaceInsideProps = {
   horizontalRatio?: number
   verticalRatio?: number
   measureFrom: "sides" | "center"
+
+  visualizeConstraints?: boolean
 }
 export class PlaceInside extends React.PureComponent<PlaceInsideProps> {
   render() {
     const { innerDimension, outerDimension, horizontalRatio, verticalRatio, measureFrom } = this.props
-    const topMargin = (alpha) => [[alpha, innerDimension.top], [-alpha, outerDimension.top]]
-    const bottomMargin = (alpha) => [[alpha, outerDimension.bottom], [-alpha, innerDimension.bottom]]
-    const leftMargin = (alpha) => [[alpha, innerDimension.left], [-alpha, outerDimension.left]]
-    const rightMargin = (alpha) => [[alpha, outerDimension.right], [-alpha, innerDimension.right]]
+    const pair = (alpha: number, variable: kiwi.Variable) => [alpha, variable] as [number, kiwi.Variable]
+    const topMargin = (alpha: number) => [pair(alpha, innerDimension.top), pair(-alpha, outerDimension.top)]
+    const bottomMargin = (alpha: number) => [pair(alpha, outerDimension.bottom), pair(-alpha, innerDimension.bottom)]
+    const leftMargin = (alpha: number) => [pair(alpha, innerDimension.left), pair(-alpha, outerDimension.left)]
+    const rightMargin = (alpha: number) => [pair(alpha, outerDimension.right), pair(-alpha, innerDimension.right)]
     return <>
       {typeof horizontalRatio === "number" && measureFrom === "center" 
         ? <Constraint
@@ -155,27 +163,55 @@ export class PlaceInside extends React.PureComponent<PlaceInsideProps> {
             equal={bottomMargin(verticalRatio)}
           />
       }
+      {this.props.visualizeConstraints && typeof horizontalRatio === "number" && measureFrom === "sides" && <>
+        <Arrow
+          startX={outerDimension.left}
+          startY={[[0.5, outerDimension.top], [0.5, outerDimension.bottom]]}
+          endX={innerDimension.left}
+          endY={[[0.5, innerDimension.top], [0.5, innerDimension.bottom]]}
+        />
+        <Arrow
+          startX={outerDimension.right}
+          startY={[[0.5, outerDimension.top], [0.5, outerDimension.bottom]]}
+          endX={innerDimension.right}
+          endY={[[0.5, innerDimension.top], [0.5, innerDimension.bottom]]}
+        />
+      </>}
     </>
   }
 }
 
 type BoundaryProps = {
   boundary: DimensionVariables
-  dimensions: any[],
   left?: boolean
   right?: boolean
   top?: boolean
   bottom?: boolean
-}
+} & ({
+  xs?: Expression[],
+  ys?: Expression[],
+} | {
+  dimensions: DimensionVariables[],
+})
 export class Boundary extends React.PureComponent<BoundaryProps> {
   render() {
-    const { left, right, top, bottom, boundary, dimensions } = this.props
-    return <>
-      {left && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.left} lessThan={dimension.left} />)}
-      {right && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.right} moreThan={dimension.right} />)}
-      {top && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.top} lessThan={dimension.top} />)}
-      {bottom && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.bottom} moreThan={dimension.bottom} />)}
-    </>
+    if ("dimensions" in this.props) {
+      const { left, right, top, bottom, boundary, dimensions } = this.props
+      return <>
+        {left && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.left} lessThan={dimension.left} />)}
+        {right && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.right} moreThan={dimension.right} />)}
+        {top && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.top} lessThan={dimension.top} />)}
+        {bottom && dimensions.map((dimension, i) => <Constraint key={i} expr={boundary.bottom} moreThan={dimension.bottom} />)}
+      </>
+    } else {
+      const { left, right, top, bottom, boundary, xs = [], ys = [] } = this.props
+      return <>
+        {left && xs.map((variable, i) => <Constraint key={i} expr={boundary.left} lessThan={variable} />)}
+        {right && xs.map((variable, i) => <Constraint key={i} expr={boundary.right} moreThan={variable} />)}
+        {top && ys.map((variable, i) => <Constraint key={i} expr={boundary.top} lessThan={variable} />)}
+        {bottom && ys.map((variable, i) => <Constraint key={i} expr={boundary.bottom} moreThan={variable} />)}
+      </>
+    }
   }
 }
 
