@@ -84,7 +84,8 @@ export default class AlignWithCompanions extends React.Component<AlignWithCompan
 
         <Boundary boundary={imageWithCompanions} dimensions={[image, comp1, comp3]} top bottom left right />
 
-        <PlaceInside innerDimension={comp1} outerDimension={image}
+        <PlaceInside
+          innerDimension={comp1} outerDimension={image}
           measureFrom={this.props.comp1.measureFrom}
           horizontalRatio={this.props.comp1.hRatio}
           verticalRatio={this.props.comp1.vRatio}

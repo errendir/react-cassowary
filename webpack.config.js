@@ -22,12 +22,12 @@ module.exports = {
     rules: [
       {
         test: /\.jsx?$/,
-        exclude: /(node_modules|bower_components)/,
+        exclude: /node_modules/,
         use: [babelLoader]
       },
       {
         test: /\.tsx?$/,
-        exclude: /(node_modules|bower_components)/,
+        exclude: /node_modules/,
         use: [
           babelLoader,
           {

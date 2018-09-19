@@ -18,11 +18,11 @@ class App extends React.Component<{}, { arrangement: "centered" | "topLeft" }> {
           <div style={{ width: "100vw", height: "100vh", background: "hsla(280, 50%, 50%, 0.5)" }}>
           </div>
         </Item>
-        <Item dimensions={background} animate>
+        <Item dimensions={background}>
           <div style={{ width: "100%", height: "100%", background: "hsla(320, 50%, 50%, 0.5)" }}>
           </div>
         </Item>
-        <Item dimensions={middleButton} wrapContentWidth wrapContentHeight animate>
+        <Item dimensions={middleButton} wrapContentWidth wrapContentHeight>
           <div
             style={{ width: 150, height: 50, background: "hsla(240, 50%, 50%, 0.5)", display: "flex", alignItems: "center", placeContent: "center", cursor: "pointer"}}
             onClick={() => this.setState(({ arrangement }) => ({ arrangement: arrangement === "centered" ? "topLeft" : "centered" }))}
